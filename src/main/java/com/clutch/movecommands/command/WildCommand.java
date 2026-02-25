@@ -4,7 +4,6 @@ import com.clutch.movecommands.ClutchMoveCommandsPlugin;
 import com.clutch.movecommands.cast.CastType;
 import com.clutch.movecommands.cast.TeleportCastService;
 import com.clutch.movecommands.rtp.RTPService;
-import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -46,44 +45,45 @@ public class WildCommand implements CommandExecutor {
             long remain = (until - now) / 1000L;
             long minutes = remain / 60;
             long seconds = remain % 60;
-            player.sendMessage(plugin.prefixed(String.format("§c쿨타임입니다! 남은 시간 : %02d분 %02d초.", minutes, seconds)));
+            player.sendTitle("§8CLUTCH", String.format("§c쿨타임입니다! 남은 시간: §f%02d:%02d", minutes, seconds), 0, 40, 10);
             return true;
         }
 
         int castSeconds = plugin.getConfig().getInt("cast.seconds", 3);
-        player.sendMessage(plugin.prefixed("§f" + castSeconds + "초 후 야생으로 이동합니다. 이동 시 취소됩니다."));
-
-        boolean started = castService.startCast(player, CastType.WILD, castSeconds, () -> completeWild(player));
-        if (!started) {
-            return true;
-        }
-
-        return true;
+        return castService.startCast(player, CastType.WILD, castSeconds, () -> completeWild(player));
     }
 
     private void completeWild(Player player) {
-        String wildcard = plugin.getConfig().getString("multiverse.wildCommand", "mvtp Wild %player%");
-        String command = wildcard.replace("%player%", player.getName());
-        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+        player.performCommand("mvtp wild");
 
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            String worldName = plugin.getConfig().getString("worlds.wild", "Wild");
-            World world = Bukkit.getWorld(worldName);
-            if (world == null) {
-                player.sendMessage(plugin.prefixed("§c안전한 위치를 찾지 못했습니다. 잠시 후 다시 시도해주세요."));
-                return;
-            }
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> tryRtpAfterWorldChange(player, 0), 2L);
+    }
 
+    private void tryRtpAfterWorldChange(Player player, int elapsedTicks) {
+        if (!player.isOnline()) {
+            return;
+        }
+
+        if ("wild".equals(player.getWorld().getName())) {
             int minRadius = plugin.getConfig().getInt("rtp.minRadius", 500);
             int maxRadius = plugin.getConfig().getInt("rtp.maxRadius", 8000);
             int maxAttempts = plugin.getConfig().getInt("rtp.maxAttempts", 30);
             int cooldownSeconds = plugin.getConfig().getInt("rtp.cooldownSeconds", 180);
 
+            World world = player.getWorld();
             rtpService.findSafeLocation(world, minRadius, maxRadius, maxAttempts).ifPresentOrElse(location -> {
                 player.teleport(location);
                 cooldownUntil.put(player.getUniqueId(), System.currentTimeMillis() + cooldownSeconds * 1000L);
-                player.sendMessage(plugin.prefixed("§f야생으로 이동했습니다!"));
+                player.sendTitle("§8CLUTCH", "§f야생으로 이동했습니다!", 0, 40, 10);
             }, () -> player.sendMessage(plugin.prefixed("§c안전한 위치를 찾지 못했습니다. 잠시 후 다시 시도해주세요.")));
-        }, 2L);
+            return;
+        }
+
+        if (elapsedTicks >= 40) {
+            player.sendMessage(plugin.prefixed("§c월드 이동을 확인하지 못했습니다. 잠시 후 다시 시도해주세요."));
+            return;
+        }
+
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> tryRtpAfterWorldChange(player, elapsedTicks + 2), 2L);
     }
 }

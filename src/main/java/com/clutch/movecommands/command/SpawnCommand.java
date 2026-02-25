@@ -3,7 +3,6 @@ package com.clutch.movecommands.command;
 import com.clutch.movecommands.ClutchMoveCommandsPlugin;
 import com.clutch.movecommands.cast.CastType;
 import com.clutch.movecommands.cast.TeleportCastService;
-import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -32,20 +31,11 @@ public class SpawnCommand implements CommandExecutor {
         }
 
         int castSeconds = plugin.getConfig().getInt("cast.seconds", 3);
-        player.sendMessage(plugin.prefixed("§f" + castSeconds + "초 후 스폰으로 이동합니다. 이동 시 취소됩니다."));
-
-        boolean started = castService.startCast(player, CastType.SPAWN, castSeconds, () -> completeSpawn(player));
-        if (!started) {
-            return true;
-        }
-
-        return true;
+        return castService.startCast(player, CastType.SPAWN, castSeconds, () -> completeSpawn(player));
     }
 
     private void completeSpawn(Player player) {
-        String template = plugin.getConfig().getString("multiverse.spawnCommand", "mvtp home %player%");
-        String command = template.replace("%player%", player.getName());
-        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
-        player.sendMessage(plugin.prefixed("§f스폰으로 이동했습니다!"));
+        player.performCommand("mvtp home");
+        player.sendTitle("§8CLUTCH", "§f스폰으로 이동했습니다!", 0, 40, 10);
     }
 }
