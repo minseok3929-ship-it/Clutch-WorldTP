@@ -4,7 +4,6 @@ import com.clutch.movecommands.ClutchMoveCommandsPlugin;
 import com.clutch.movecommands.cast.CastType;
 import com.clutch.movecommands.cast.TeleportCastService;
 import com.clutch.movecommands.rtp.RTPService;
-import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -88,11 +87,16 @@ public class WildCommand implements CommandExecutor {
         int maxAttempts = plugin.getConfig().getInt("rtp.maxAttempts", 30);
         int cooldownSeconds = plugin.getConfig().getInt("rtp.cooldownSeconds", 180);
 
-        World world = player.getWorld();
-        rtpService.findSafeLocation(world, minRadius, maxRadius, maxAttempts).ifPresentOrElse(location -> {
-            player.teleport(location);
-            cooldownUntil.put(player.getUniqueId(), System.currentTimeMillis() + cooldownSeconds * 1000L);
-            player.sendTitle("§8CLUTCH", "§f야생으로 이동했습니다!", 0, 40, 10);
-        }, () -> player.sendMessage(plugin.prefixed("§c안전한 위치를 찾지 못했습니다. 잠시 후 다시 시도해주세요.")));
+        rtpService.findAndTeleportAsync(
+                player,
+                minRadius,
+                maxRadius,
+                maxAttempts,
+                () -> {
+                    cooldownUntil.put(player.getUniqueId(), System.currentTimeMillis() + cooldownSeconds * 1000L);
+                    player.sendTitle("§8CLUTCH", "§f야생으로 이동했습니다!", 0, 40, 10);
+                },
+                () -> player.sendTitle("§8CLUTCH", "§c안전한 위치를 찾지 못했습니다.", 0, 40, 10)
+        );
     }
 }
