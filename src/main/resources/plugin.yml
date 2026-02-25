@@ -1,0 +1,27 @@
+name: Clutch-MoveCommands
+version: 1.0.0
+main: com.clutch.movecommands.ClutchMoveCommandsPlugin
+api-version: '1.21'
+author: Clutch
+
+commands:
+  야생:
+    usage: "/야생"
+    description: "야생 월드로 이동 후 랜덤 텔레포트"
+    permission: clutch.move.wild
+  wild:
+    usage: "/wild"
+    permission: clutch.move.wild
+  스폰:
+    usage: "/스폰"
+    description: "스폰 월드로 이동"
+    permission: clutch.move.spawn
+  spawn:
+    usage: "/spawn"
+    permission: clutch.move.spawn
+
+permissions:
+  clutch.move.wild:
+    default: true
+  clutch.move.spawn:
+    default: true
