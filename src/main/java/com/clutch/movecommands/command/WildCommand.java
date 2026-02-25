@@ -9,6 +9,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -56,34 +57,42 @@ public class WildCommand implements CommandExecutor {
     private void completeWild(Player player) {
         player.performCommand("mvtp wild");
 
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> tryRtpAfterWorldChange(player, 0), 2L);
+        new BukkitRunnable() {
+            private int elapsedTicks = 0;
+
+            @Override
+            public void run() {
+                if (!player.isOnline()) {
+                    cancel();
+                    return;
+                }
+
+                elapsedTicks++;
+                if (player.getWorld().getName().equalsIgnoreCase("wild")) {
+                    executeRtp(player);
+                    cancel();
+                    return;
+                }
+
+                if (elapsedTicks >= 40) {
+                    player.sendTitle("§8CLUTCH", "§c월드 이동에 실패했습니다.", 0, 40, 10);
+                    cancel();
+                }
+            }
+        }.runTaskTimer(plugin, 1L, 1L);
     }
 
-    private void tryRtpAfterWorldChange(Player player, int elapsedTicks) {
-        if (!player.isOnline()) {
-            return;
-        }
+    private void executeRtp(Player player) {
+        int minRadius = plugin.getConfig().getInt("rtp.minRadius", 500);
+        int maxRadius = plugin.getConfig().getInt("rtp.maxRadius", 8000);
+        int maxAttempts = plugin.getConfig().getInt("rtp.maxAttempts", 30);
+        int cooldownSeconds = plugin.getConfig().getInt("rtp.cooldownSeconds", 180);
 
-        if ("wild".equals(player.getWorld().getName())) {
-            int minRadius = plugin.getConfig().getInt("rtp.minRadius", 500);
-            int maxRadius = plugin.getConfig().getInt("rtp.maxRadius", 8000);
-            int maxAttempts = plugin.getConfig().getInt("rtp.maxAttempts", 30);
-            int cooldownSeconds = plugin.getConfig().getInt("rtp.cooldownSeconds", 180);
-
-            World world = player.getWorld();
-            rtpService.findSafeLocation(world, minRadius, maxRadius, maxAttempts).ifPresentOrElse(location -> {
-                player.teleport(location);
-                cooldownUntil.put(player.getUniqueId(), System.currentTimeMillis() + cooldownSeconds * 1000L);
-                player.sendTitle("§8CLUTCH", "§f야생으로 이동했습니다!", 0, 40, 10);
-            }, () -> player.sendMessage(plugin.prefixed("§c안전한 위치를 찾지 못했습니다. 잠시 후 다시 시도해주세요.")));
-            return;
-        }
-
-        if (elapsedTicks >= 40) {
-            player.sendMessage(plugin.prefixed("§c월드 이동을 확인하지 못했습니다. 잠시 후 다시 시도해주세요."));
-            return;
-        }
-
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> tryRtpAfterWorldChange(player, elapsedTicks + 2), 2L);
+        World world = player.getWorld();
+        rtpService.findSafeLocation(world, minRadius, maxRadius, maxAttempts).ifPresentOrElse(location -> {
+            player.teleport(location);
+            cooldownUntil.put(player.getUniqueId(), System.currentTimeMillis() + cooldownSeconds * 1000L);
+            player.sendTitle("§8CLUTCH", "§f야생으로 이동했습니다!", 0, 40, 10);
+        }, () -> player.sendMessage(plugin.prefixed("§c안전한 위치를 찾지 못했습니다. 잠시 후 다시 시도해주세요.")));
     }
 }

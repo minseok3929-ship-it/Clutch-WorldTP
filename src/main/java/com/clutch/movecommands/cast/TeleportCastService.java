@@ -37,7 +37,7 @@ public class TeleportCastService {
                     return;
                 }
 
-                player.sendTitle("§8CLUTCH", "§e" + count, 0, 20, 0);
+                player.sendTitle("§8CLUTCH", "§f§e" + count + "초 §f후 이동합니다", 0, 20, 0);
             }, delayTicks);
         }
 
@@ -49,10 +49,6 @@ public class TeleportCastService {
         CastSession session = new CastSession(type, startLocation, task, System.currentTimeMillis());
         sessions.put(player.getUniqueId(), session);
         return true;
-    }
-
-    public boolean isCasting(UUID uuid) {
-        return sessions.containsKey(uuid);
     }
 
     public CastSession getSession(UUID uuid) {
