@@ -37,7 +37,7 @@ public class TeleportCastService {
                     return;
                 }
 
-                player.sendTitle("§8CLUTCH", "§f§e" + count + "초 §f후 이동합니다", 0, 20, 0);
+                player.sendTitle("§8CLUTCH", "§e" + count + "초 §f후 이동합니다", 0, 20, 0);
             }, delayTicks);
         }
 

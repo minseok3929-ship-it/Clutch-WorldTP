@@ -19,15 +19,21 @@ public class RTPService {
     }
 
     public void findAndTeleportAsync(Player player,
-                                     int radius,
+                                     World world,
+                                     int minRadius,
+                                     int maxRadius,
                                      int maxAttempts,
                                      Runnable onSuccess,
                                      Runnable onFail) {
-        attemptCandidate(player, Math.max(1, radius), maxAttempts, 0, onSuccess, onFail);
+        int safeMinRadius = Math.max(0, minRadius);
+        int safeMaxRadius = Math.max(safeMinRadius, maxRadius);
+        attemptCandidate(player, world, safeMinRadius, safeMaxRadius, maxAttempts, 0, onSuccess, onFail);
     }
 
     private void attemptCandidate(Player player,
-                                  int radius,
+                                  World world,
+                                  int minRadius,
+                                  int maxRadius,
                                   int maxAttempts,
                                   int attemptCount,
                                   Runnable onSuccess,
@@ -36,13 +42,12 @@ public class RTPService {
             return;
         }
 
-        if (attemptCount >= maxAttempts) {
+        if (!isWildOverworld(world)) {
             onFail.run();
             return;
         }
 
-        World world = player.getWorld();
-        if (!isWildOverworld(world)) {
+        if (attemptCount >= maxAttempts) {
             onFail.run();
             return;
         }
@@ -51,14 +56,14 @@ public class RTPService {
         ThreadLocalRandom random = ThreadLocalRandom.current();
 
         double angle = random.nextDouble() * Math.PI * 2;
-        double candidateRadius = random.nextDouble() * radius;
+        double radius = minRadius + random.nextDouble() * (maxRadius - minRadius);
 
-        int x = spawn.getBlockX() + (int) (Math.cos(angle) * candidateRadius);
-        int z = spawn.getBlockZ() + (int) (Math.sin(angle) * candidateRadius);
+        int x = spawn.getBlockX() + (int) (Math.cos(angle) * radius);
+        int z = spawn.getBlockZ() + (int) (Math.sin(angle) * radius);
 
         Location borderCheckLocation = new Location(world, x + 0.5, spawn.getY(), z + 0.5);
         if (!world.getWorldBorder().isInside(borderCheckLocation)) {
-            attemptCandidate(player, radius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+            attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail);
             return;
         }
 
@@ -71,14 +76,9 @@ public class RTPService {
                         return;
                     }
 
-                    if (!isWildOverworld(player.getWorld())) {
-                        onFail.run();
-                        return;
-                    }
-
                     Location safeLocation = findSafeLocationInLoadedChunk(world, x, z);
                     if (safeLocation == null) {
-                        attemptCandidate(player, radius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+                        attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail);
                         return;
                     }
 
@@ -87,14 +87,14 @@ public class RTPService {
                                 if (success) {
                                     onSuccess.run();
                                 } else {
-                                    attemptCandidate(player, radius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+                                    attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail);
                                 }
                             })
                     );
                 })
         ).exceptionally(throwable -> {
             plugin.getServer().getScheduler().runTask(plugin,
-                    () -> attemptCandidate(player, radius, maxAttempts, attemptCount + 1, onSuccess, onFail));
+                    () -> attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail));
             return null;
         });
     }
@@ -122,8 +122,7 @@ public class RTPService {
     }
 
     private boolean isWildOverworld(World world) {
-        return world.getName().equalsIgnoreCase("wild")
-                && world.getEnvironment() == World.Environment.NORMAL;
+        return world.getEnvironment() == World.Environment.NORMAL;
     }
 
     private boolean isSafeGround(Block block) {

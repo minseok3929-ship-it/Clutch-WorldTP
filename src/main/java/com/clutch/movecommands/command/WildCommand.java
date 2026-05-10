@@ -4,11 +4,12 @@ import com.clutch.movecommands.ClutchMoveCommandsPlugin;
 import com.clutch.movecommands.cast.CastType;
 import com.clutch.movecommands.cast.TeleportCastService;
 import com.clutch.movecommands.rtp.RTPService;
+import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -54,41 +55,23 @@ public class WildCommand implements CommandExecutor {
     }
 
     private void completeWild(Player player) {
-        player.performCommand("mvtp wild");
+        String worldName = plugin.getConfig().getString("worlds.wild", "Wild");
+        World wildWorld = Bukkit.getWorld(worldName);
+        if (wildWorld == null) {
+            player.sendTitle("§8CLUTCH", "§c야생 월드를 찾을 수 없습니다.", 0, 40, 10);
+            return;
+        }
 
-        new BukkitRunnable() {
-            private int elapsedTicks = 0;
-
-            @Override
-            public void run() {
-                if (!player.isOnline()) {
-                    cancel();
-                    return;
-                }
-
-                elapsedTicks++;
-                if (player.getWorld().getName().equalsIgnoreCase("wild")) {
-                    executeRtp(player);
-                    cancel();
-                    return;
-                }
-
-                if (elapsedTicks >= 40) {
-                    player.sendTitle("§8CLUTCH", "§c월드 이동에 실패했습니다.", 0, 40, 10);
-                    cancel();
-                }
-            }
-        }.runTaskTimer(plugin, 1L, 1L);
-    }
-
-    private void executeRtp(Player player) {
-        int radius = plugin.getConfig().getInt("rtp.radius", 3000);
+        int minRadius = plugin.getConfig().getInt("rtp.minRadius", 300);
+        int maxRadius = plugin.getConfig().getInt("rtp.maxRadius", 3000);
         int maxAttempts = plugin.getConfig().getInt("rtp.maxAttempts", 30);
         int cooldownSeconds = plugin.getConfig().getInt("rtp.cooldownSeconds", 180);
 
         rtpService.findAndTeleportAsync(
                 player,
-                radius,
+                wildWorld,
+                minRadius,
+                maxRadius,
                 maxAttempts,
                 () -> {
                     cooldownUntil.put(player.getUniqueId(), System.currentTimeMillis() + cooldownSeconds * 1000L);
