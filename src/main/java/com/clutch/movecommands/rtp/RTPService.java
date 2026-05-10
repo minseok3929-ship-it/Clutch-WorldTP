@@ -19,17 +19,15 @@ public class RTPService {
     }
 
     public void findAndTeleportAsync(Player player,
-                                     int minRadius,
-                                     int maxRadius,
+                                     int radius,
                                      int maxAttempts,
                                      Runnable onSuccess,
                                      Runnable onFail) {
-        attemptCandidate(player, minRadius, maxRadius, maxAttempts, 0, onSuccess, onFail);
+        attemptCandidate(player, Math.max(1, radius), maxAttempts, 0, onSuccess, onFail);
     }
 
     private void attemptCandidate(Player player,
-                                  int minRadius,
-                                  int maxRadius,
+                                  int radius,
                                   int maxAttempts,
                                   int attemptCount,
                                   Runnable onSuccess,
@@ -44,13 +42,25 @@ public class RTPService {
         }
 
         World world = player.getWorld();
+        if (!isWildOverworld(world)) {
+            onFail.run();
+            return;
+        }
+
+        Location spawn = world.getSpawnLocation();
         ThreadLocalRandom random = ThreadLocalRandom.current();
 
-        double angle = random.nextDouble(0, Math.PI * 2);
-        int radius = random.nextInt(minRadius, maxRadius + 1);
+        double angle = random.nextDouble() * Math.PI * 2;
+        double candidateRadius = random.nextDouble() * radius;
 
-        int x = (int) Math.round(Math.cos(angle) * radius);
-        int z = (int) Math.round(Math.sin(angle) * radius);
+        int x = spawn.getBlockX() + (int) (Math.cos(angle) * candidateRadius);
+        int z = spawn.getBlockZ() + (int) (Math.sin(angle) * candidateRadius);
+
+        Location borderCheckLocation = new Location(world, x + 0.5, spawn.getY(), z + 0.5);
+        if (!world.getWorldBorder().isInside(borderCheckLocation)) {
+            attemptCandidate(player, radius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+            return;
+        }
 
         int chunkX = x >> 4;
         int chunkZ = z >> 4;
@@ -61,14 +71,14 @@ public class RTPService {
                         return;
                     }
 
-                    if (!player.getWorld().getName().equalsIgnoreCase("wild")) {
+                    if (!isWildOverworld(player.getWorld())) {
                         onFail.run();
                         return;
                     }
 
                     Location safeLocation = findSafeLocationInLoadedChunk(world, x, z);
                     if (safeLocation == null) {
-                        attemptCandidate(player, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+                        attemptCandidate(player, radius, maxAttempts, attemptCount + 1, onSuccess, onFail);
                         return;
                     }
 
@@ -77,14 +87,14 @@ public class RTPService {
                                 if (success) {
                                     onSuccess.run();
                                 } else {
-                                    attemptCandidate(player, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+                                    attemptCandidate(player, radius, maxAttempts, attemptCount + 1, onSuccess, onFail);
                                 }
                             })
                     );
                 })
         ).exceptionally(throwable -> {
             plugin.getServer().getScheduler().runTask(plugin,
-                    () -> attemptCandidate(player, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail));
+                    () -> attemptCandidate(player, radius, maxAttempts, attemptCount + 1, onSuccess, onFail));
             return null;
         });
     }
@@ -95,6 +105,11 @@ public class RTPService {
         Block feet = world.getBlockAt(x, highestY + 1, z);
         Block head = world.getBlockAt(x, highestY + 2, z);
 
+        Location location = new Location(world, x + 0.5, highestY + 1, z + 0.5);
+        if (!world.getWorldBorder().isInside(location)) {
+            return null;
+        }
+
         if (!isSafeGround(ground)) {
             return null;
         }
@@ -103,7 +118,12 @@ public class RTPService {
             return null;
         }
 
-        return new Location(world, x + 0.5, highestY + 1, z + 0.5);
+        return location;
+    }
+
+    private boolean isWildOverworld(World world) {
+        return world.getName().equalsIgnoreCase("wild")
+                && world.getEnvironment() == World.Environment.NORMAL;
     }
 
     private boolean isSafeGround(Block block) {

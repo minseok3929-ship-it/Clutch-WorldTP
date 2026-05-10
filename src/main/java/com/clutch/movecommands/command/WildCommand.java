@@ -82,15 +82,13 @@ public class WildCommand implements CommandExecutor {
     }
 
     private void executeRtp(Player player) {
-        int minRadius = plugin.getConfig().getInt("rtp.minRadius", 500);
-        int maxRadius = plugin.getConfig().getInt("rtp.maxRadius", 8000);
+        int radius = plugin.getConfig().getInt("rtp.radius", 3000);
         int maxAttempts = plugin.getConfig().getInt("rtp.maxAttempts", 30);
         int cooldownSeconds = plugin.getConfig().getInt("rtp.cooldownSeconds", 180);
 
         rtpService.findAndTeleportAsync(
                 player,
-                minRadius,
-                maxRadius,
+                radius,
                 maxAttempts,
                 () -> {
                     cooldownUntil.put(player.getUniqueId(), System.currentTimeMillis() + cooldownSeconds * 1000L);
