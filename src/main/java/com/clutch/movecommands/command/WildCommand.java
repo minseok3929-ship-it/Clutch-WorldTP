@@ -55,23 +55,22 @@ public class WildCommand implements CommandExecutor {
     }
 
     private void completeWild(Player player) {
-        String worldName = plugin.getConfig().getString("worlds.wild", "Wild");
+        String worldName = plugin.getConfig().getString("rtp.world",
+                plugin.getConfig().getString("worlds.wild", "wild"));
         World wildWorld = Bukkit.getWorld(worldName);
         if (wildWorld == null) {
             player.sendTitle("§8CLUTCH", "§c야생 월드를 찾을 수 없습니다.", 0, 40, 10);
             return;
         }
 
-        int minRadius = plugin.getConfig().getInt("rtp.minRadius", 300);
-        int maxRadius = plugin.getConfig().getInt("rtp.maxRadius", 3000);
+        int range = plugin.getConfig().getInt("rtp.range", 500);
         int maxAttempts = plugin.getConfig().getInt("rtp.maxAttempts", 30);
         int cooldownSeconds = plugin.getConfig().getInt("rtp.cooldownSeconds", 180);
 
         rtpService.findAndTeleportAsync(
                 player,
                 wildWorld,
-                minRadius,
-                maxRadius,
+                range,
                 maxAttempts,
                 () -> {
                     cooldownUntil.put(player.getUniqueId(), System.currentTimeMillis() + cooldownSeconds * 1000L);

@@ -20,20 +20,16 @@ public class RTPService {
 
     public void findAndTeleportAsync(Player player,
                                      World world,
-                                     int minRadius,
-                                     int maxRadius,
+                                     int range,
                                      int maxAttempts,
                                      Runnable onSuccess,
                                      Runnable onFail) {
-        int safeMinRadius = Math.max(0, minRadius);
-        int safeMaxRadius = Math.max(safeMinRadius, maxRadius);
-        attemptCandidate(player, world, safeMinRadius, safeMaxRadius, maxAttempts, 0, onSuccess, onFail);
+        attemptCandidate(player, world, Math.max(0, range), maxAttempts, 0, onSuccess, onFail);
     }
 
     private void attemptCandidate(Player player,
                                   World world,
-                                  int minRadius,
-                                  int maxRadius,
+                                  int range,
                                   int maxAttempts,
                                   int attemptCount,
                                   Runnable onSuccess,
@@ -52,18 +48,13 @@ public class RTPService {
             return;
         }
 
-        Location spawn = world.getSpawnLocation();
         ThreadLocalRandom random = ThreadLocalRandom.current();
+        int x = random.nextInt(-range, range + 1);
+        int z = random.nextInt(-range, range + 1);
 
-        double angle = random.nextDouble() * Math.PI * 2;
-        double radius = minRadius + random.nextDouble() * (maxRadius - minRadius);
-
-        int x = spawn.getBlockX() + (int) (Math.cos(angle) * radius);
-        int z = spawn.getBlockZ() + (int) (Math.sin(angle) * radius);
-
-        Location borderCheckLocation = new Location(world, x + 0.5, spawn.getY(), z + 0.5);
+        Location borderCheckLocation = new Location(world, x + 0.5, world.getSpawnLocation().getY(), z + 0.5);
         if (!world.getWorldBorder().isInside(borderCheckLocation)) {
-            attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+            attemptCandidate(player, world, range, maxAttempts, attemptCount + 1, onSuccess, onFail);
             return;
         }
 
@@ -78,7 +69,7 @@ public class RTPService {
 
                     Location safeLocation = findSafeLocationInLoadedChunk(world, x, z);
                     if (safeLocation == null) {
-                        attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+                        attemptCandidate(player, world, range, maxAttempts, attemptCount + 1, onSuccess, onFail);
                         return;
                     }
 
@@ -87,14 +78,14 @@ public class RTPService {
                                 if (success) {
                                     onSuccess.run();
                                 } else {
-                                    attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+                                    attemptCandidate(player, world, range, maxAttempts, attemptCount + 1, onSuccess, onFail);
                                 }
                             })
                     );
                 })
         ).exceptionally(throwable -> {
             plugin.getServer().getScheduler().runTask(plugin,
-                    () -> attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail));
+                    () -> attemptCandidate(player, world, range, maxAttempts, attemptCount + 1, onSuccess, onFail));
             return null;
         });
     }
@@ -135,7 +126,14 @@ public class RTPService {
                 && material != Material.LAVA
                 && material != Material.KELP
                 && material != Material.SEAGRASS
-                && material != Material.TALL_SEAGRASS;
+                && material != Material.TALL_SEAGRASS
+                && material != Material.MAGMA_BLOCK
+                && material != Material.CACTUS
+                && material != Material.CAMPFIRE
+                && material != Material.SOUL_CAMPFIRE
+                && material != Material.FIRE
+                && material != Material.SOUL_FIRE
+                && material != Material.POWDER_SNOW;
     }
 
     private boolean isPassable(Block block) {

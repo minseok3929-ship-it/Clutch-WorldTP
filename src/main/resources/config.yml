@@ -1,14 +1,14 @@
 prefix: "§8[CLUTCH] "
 
 worlds:
-  wild: "Wild"
+  wild: "wild"
   spawn: "home"
 
 cast:
   seconds: 3
 
 rtp:
-  minRadius: 300
-  maxRadius: 3000
+  world: "wild"
+  range: 500
   maxAttempts: 30
   cooldownSeconds: 180
