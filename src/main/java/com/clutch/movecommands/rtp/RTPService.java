@@ -6,8 +6,8 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Player;
 
-import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class RTPService {
@@ -18,34 +18,110 @@ public class RTPService {
         this.plugin = plugin;
     }
 
-    public Optional<Location> findSafeLocation(World world, int minRadius, int maxRadius, int maxAttempts) {
-        ThreadLocalRandom random = ThreadLocalRandom.current();
+    public void findAndTeleportAsync(Player player,
+                                     World world,
+                                     int minRadius,
+                                     int maxRadius,
+                                     int maxAttempts,
+                                     Runnable onSuccess,
+                                     Runnable onFail) {
+        int safeMinRadius = Math.max(0, minRadius);
+        int safeMaxRadius = Math.max(safeMinRadius, maxRadius);
+        attemptCandidate(player, world, safeMinRadius, safeMaxRadius, maxAttempts, 0, onSuccess, onFail);
+    }
 
-        for (int i = 0; i < maxAttempts; i++) {
-            double angle = random.nextDouble(0, Math.PI * 2);
-            int radius = random.nextInt(minRadius, maxRadius + 1);
-
-            int x = (int) Math.round(Math.cos(angle) * radius);
-            int z = (int) Math.round(Math.sin(angle) * radius);
-
-            int highestY = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING);
-            Block ground = world.getBlockAt(x, highestY, z);
-            Block feet = world.getBlockAt(x, highestY + 1, z);
-            Block head = world.getBlockAt(x, highestY + 2, z);
-
-            if (!isSafeGround(ground)) {
-                continue;
-            }
-
-            if (!isPassable(feet) || !isPassable(head)) {
-                continue;
-            }
-
-            Location location = new Location(world, x + 0.5, highestY + 1, z + 0.5);
-            return Optional.of(location);
+    private void attemptCandidate(Player player,
+                                  World world,
+                                  int minRadius,
+                                  int maxRadius,
+                                  int maxAttempts,
+                                  int attemptCount,
+                                  Runnable onSuccess,
+                                  Runnable onFail) {
+        if (!player.isOnline()) {
+            return;
         }
 
-        return Optional.empty();
+        if (!isWildOverworld(world)) {
+            onFail.run();
+            return;
+        }
+
+        if (attemptCount >= maxAttempts) {
+            onFail.run();
+            return;
+        }
+
+        Location spawn = world.getSpawnLocation();
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        double angle = random.nextDouble() * Math.PI * 2;
+        double radius = minRadius + random.nextDouble() * (maxRadius - minRadius);
+
+        int x = spawn.getBlockX() + (int) (Math.cos(angle) * radius);
+        int z = spawn.getBlockZ() + (int) (Math.sin(angle) * radius);
+
+        Location borderCheckLocation = new Location(world, x + 0.5, spawn.getY(), z + 0.5);
+        if (!world.getWorldBorder().isInside(borderCheckLocation)) {
+            attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+            return;
+        }
+
+        int chunkX = x >> 4;
+        int chunkZ = z >> 4;
+
+        world.getChunkAtAsync(chunkX, chunkZ, true).thenAccept(chunk ->
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    if (!player.isOnline()) {
+                        return;
+                    }
+
+                    Location safeLocation = findSafeLocationInLoadedChunk(world, x, z);
+                    if (safeLocation == null) {
+                        attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+                        return;
+                    }
+
+                    player.teleportAsync(safeLocation).thenAccept(success ->
+                            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                                if (success) {
+                                    onSuccess.run();
+                                } else {
+                                    attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail);
+                                }
+                            })
+                    );
+                })
+        ).exceptionally(throwable -> {
+            plugin.getServer().getScheduler().runTask(plugin,
+                    () -> attemptCandidate(player, world, minRadius, maxRadius, maxAttempts, attemptCount + 1, onSuccess, onFail));
+            return null;
+        });
+    }
+
+    private Location findSafeLocationInLoadedChunk(World world, int x, int z) {
+        int highestY = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING);
+        Block ground = world.getBlockAt(x, highestY, z);
+        Block feet = world.getBlockAt(x, highestY + 1, z);
+        Block head = world.getBlockAt(x, highestY + 2, z);
+
+        Location location = new Location(world, x + 0.5, highestY + 1, z + 0.5);
+        if (!world.getWorldBorder().isInside(location)) {
+            return null;
+        }
+
+        if (!isSafeGround(ground)) {
+            return null;
+        }
+
+        if (!isPassable(feet) || !isPassable(head)) {
+            return null;
+        }
+
+        return location;
+    }
+
+    private boolean isWildOverworld(World world) {
+        return world.getEnvironment() == World.Environment.NORMAL;
     }
 
     private boolean isSafeGround(Block block) {
@@ -58,7 +134,14 @@ public class RTPService {
                 && material != Material.LAVA
                 && material != Material.KELP
                 && material != Material.SEAGRASS
-                && material != Material.TALL_SEAGRASS;
+                && material != Material.TALL_SEAGRASS
+                && material != Material.MAGMA_BLOCK
+                && material != Material.CACTUS
+                && material != Material.CAMPFIRE
+                && material != Material.SOUL_CAMPFIRE
+                && material != Material.FIRE
+                && material != Material.SOUL_FIRE
+                && material != Material.POWDER_SNOW;
     }
 
     private boolean isPassable(Block block) {

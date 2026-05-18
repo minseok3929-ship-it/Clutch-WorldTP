@@ -1,18 +1,14 @@
 prefix: "§8[CLUTCH] "
 
 worlds:
-  wild: "Wild"
+  wild: "wild"
   spawn: "home"
 
 cast:
   seconds: 3
 
 rtp:
-  minRadius: 500
-  maxRadius: 8000
-  maxAttempts: 30
+  minRadius: 1
+  maxRadius: 4000
+  maxAttempts: 50
   cooldownSeconds: 180
-
-multiverse:
-  wildCommand: "mvtp Wild %player%"
-  spawnCommand: "mvtp home %player%"

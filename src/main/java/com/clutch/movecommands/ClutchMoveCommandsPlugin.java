@@ -4,6 +4,7 @@ import com.clutch.movecommands.cast.TeleportCastService;
 import com.clutch.movecommands.command.SpawnCommand;
 import com.clutch.movecommands.command.WildCommand;
 import com.clutch.movecommands.listener.MoveCancelListener;
+import com.clutch.movecommands.listener.PlayerRespawnListener;
 import com.clutch.movecommands.rtp.RTPService;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -29,6 +30,7 @@ public final class ClutchMoveCommandsPlugin extends JavaPlugin {
         registerCommand("spawn", spawnCommand);
 
         getServer().getPluginManager().registerEvents(new MoveCancelListener(castService), this);
+        getServer().getPluginManager().registerEvents(new PlayerRespawnListener(this), this);
     }
 
     private void registerCommand(String name, org.bukkit.command.CommandExecutor executor) {
