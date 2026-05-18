@@ -8,7 +8,7 @@ cast:
   seconds: 3
 
 rtp:
-  world: "wild"
-  range: 500
-  maxAttempts: 30
+  minRadius: 1
+  maxRadius: 4000
+  maxAttempts: 50
   cooldownSeconds: 180
